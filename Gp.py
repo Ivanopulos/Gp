@@ -90,7 +90,7 @@ for i in range(5, 121, 5):
     df3 = pd.concat([df3, df2], axis=0)
 print(df3.shape, df3.columns, df3.dtypes, df3.describe())
 #df3['fsst'] = df3.v_fin['sum'] / df3.v_fin['sum']  # средний вес на веру в событие
-print(df3[1:50], df3[-70:])
+print(df3[1:50], df3[-50:])
 df3.to_excel(r'File_Name.xlsx')
 
 
