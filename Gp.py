@@ -49,6 +49,7 @@ def step_1_to21():
 
 #step_1_to21()#df в резерве на пробный обсчет результатов
 snl_session("step_1_to21")
+#V1 серия поиска корреляции объема гност периода с вероятностью прогноза, итог отрицательный
 sdf = sdf.rename(columns={'<VOL>': '<V>', '<OPEN>': '<O>', '<CLOSE>': '<C>', '<LOW>': '<L>', '<HIGH>': '<H>'})
 df = df.rename(columns={'<VOL>': '<V>', '<OPEN>': '<O>', '<CLOSE>': '<C>', '<LOW>': '<L>', '<HIGH>': '<H>'})
 sdf.index = pd.to_datetime(sdf.index, format="%Y%m%d %H%M%S")
@@ -63,8 +64,7 @@ df2 = pd.DataFrame()  # for groupby
 df3 = pd.DataFrame()  # for saving concat
 df4 = pd.DataFrame()
 for i in range(5, 121, 5):
-    df1 = sdf.resample("1min", label='right',
-                       closed='right').last()  # перегруппировка чтобы не ловить прыжок, а крайнее смещение просто давало ошибку, перестает работать на круглосуточных вариантах
+    df1 = sdf.resample("1min", label='right', closed='right').last()  # перегруппировка чтобы не ловить прыжок, а крайнее смещение просто давало ошибку, перестает работать на круглосуточных вариантах
     print(i)
     df1['b_gnost'] = df1.mean1.shift(i * 2) - df1.mean1.shift(i) < 0  # value гностического шага (в дальнейшем должен множится)
     df1['b_fin'] = df1.mean1.shift(i) - df1.mean1 < 0  # фин шаг
@@ -72,19 +72,24 @@ for i in range(5, 121, 5):
     df1['na'] = df1.mean1.shift(i * 2)  # метка для удаления битых данных
     df1['na1'] = df1.mean1.shift(i)  # метка для удаления битых данных(ловит только перерывы)
     df1['weday'] = df1.index.dayofweek
-    df1['V'] = df1['<V>'].rolling(window=i).sum().shift(i)/i  # df.rolling('2s').sum() # суммируем i минут c -i*2 до -i строки в минуту
+    #V1 df1['V'] = df1['<V>'].rolling(window=i).sum().shift(i)/i  # df.rolling('2s').sum() # суммируем i минут c -i*2 до -i строки # объем предпосылки в минуту
 
     df1 = df1.dropna()  # [df1.mean1 != np.NaN] сносим все строки где хоть одна ошибка
 
     df1['t_of_end'] = df1.index.strftime('%H%M')  # время полного окончания хода
-    df1['t_step'] = i  # время/размер шага
+    df1['t_step'] = i  # время=размер шага
     df1 = df1.drop(['na', 'na1', 'mean1'], axis=1)  #
-    df2 = df1.groupby(['t_of_end', 't_step', 'b_gnost', 'b_fin', 'weday']).agg({'v_fin': ["sum", "size"], 'V': ['last']}).reset_index()  # 'v_fin':["sum", "size"], '<V>':['sum']  '<V>': ['mean'] как вариант учета напряжения
-    # нужно ли туфин в самой группировке для финальных подсчетов? где тогда хранить
-    # нужен ли "модуль" в эффекте финального шага? походу нет ибо в агрегации будет давать неправильный эффект изза однонаправленности знака
+    #V1 df2 = df1.groupby(['t_of_end', 't_step', 'b_gnost', 'b_fin', 'weday']).agg({'v_fin': ["sum", "size"], 'V': ['mean']}).reset_index()  # 'v_fin':["sum", "size"], '<V>':['sum']  '<V>': ['mean'] как вариант учета напряжения
+    df2 = df1.groupby(['t_of_end', 't_step', 'b_gnost', 'weday']).agg(
+        {'v_fin': ["sum", "size"]}).reset_index()
+    df2['v_fin_abs'] = abs(df2.v_fin['sum'])  # модуль эффекта хода
+    df2[('v_fin', 'sum')] = df2[('v_fin', 'sum')]>0  # знак хода
+    df2 = df2.rename(columns={('v_fin', 'sum'): ('v_fin', 'bfin')})
     print(df2)
+    # нужно ли туфин в самой группировке для финальных подсчетов? где тогда хранить
     df3 = pd.concat([df3, df2], axis=0)
-df3['fsst'] = df3.v_fin['sum'] / df3.v_fin['sum']  # средний вес на веру в событие
+print(df3.shape, df3.columns, df3.dtypes, df3.describe())
+#df3['fsst'] = df3.v_fin['sum'] / df3.v_fin['sum']  # средний вес на веру в событие
 print(df3[1:50], df3[-70:])
 df3.to_excel(r'File_Name.xlsx')
 
